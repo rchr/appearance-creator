@@ -19,6 +19,15 @@ public class AppearanceCreator {
     private static final String SELECT_FROM_APPEARANCE = "SELECT id FROM citydb.appearance WHERE cityobject_id = ? AND theme = ?";
     private static final String INSERT_INTO_SURFACE_DATA = "INSERT INTO citydb.surface_data (gmlid, name, is_front, objectclass_id, x3d_shininess, x3d_transparency, x3d_ambient_intensity, x3d_specular_color, x3d_diffuse_color, x3d_emissive_color, x3d_is_smooth) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     private static final String SELECT_FROM_SURFACE_DATA = "SELECT id FROM citydb.surface_data WHERE gmlid = ?";
+    private static final String INSERT_MAX = "WITH \n" +
+            "cityobj_id AS (\n" +
+            "\tSELECT id, objectclass_id\n" +
+            "\tFROM citydb.cityobject\n" +
+            "\tWHERE gmlid = 'BLDG_GLOBAL_ATTRIBS'\n" +
+            ")\n" +
+            "INSERT INTO citydb.cityobject_genericattrib (cityobject_id, attrname, datatype, realval)\n" +
+            "SELECT id, 'MAX_ATTRIB_VAL_4_COLOR', 3, ? FROM cityobj_id";
+
     private Connection connection;
 
     public AppearanceCreator(Connection connection) {
@@ -41,6 +50,7 @@ public class AppearanceCreator {
             for (Integer id : cityobjectsWOAttrib) {
                 createAppearanceForCityObjectWOAttrib(id, themeName, surfaceDataName);
             }
+            insertMaxAttribValueForColor(max);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot create appearance.", e);
         }
@@ -205,6 +215,18 @@ public class AppearanceCreator {
         rs.next();
         int surfaceDataID = rs.getInt("id");
         return surfaceDataID;
+    }
+
+    /**
+     * Inserts value considered as max value into database.
+     * Useful for visualizations.
+     * @param max
+     * @throws SQLException
+     */
+    private void insertMaxAttribValueForColor(double max) throws SQLException {
+        PreparedStatement st = connection.prepareStatement(INSERT_MAX);
+        st.setDouble(1, max);
+        st.executeUpdate();
     }
 
 }
