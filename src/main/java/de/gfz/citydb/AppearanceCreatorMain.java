@@ -1,6 +1,7 @@
 package de.gfz.citydb;
 
 import de.gfz.citydb.appearance.AppearanceCreator;
+import de.gfz.citydb.appearance.AppearanceRemover;
 import de.gfz.citydb.appearance.GenericAttributeGetter;
 import de.gfz.citydb.appearance.GenericAttributeWithCityobject;
 import de.gfz.citydb.io.DBConnector;
@@ -63,6 +64,12 @@ public class AppearanceCreatorMain {
                 .hasArg()
                 .build();
 
+        Option removeApp = Option.builder("r")
+                .required(false)
+                .desc("Delete appearance and surface_data if set.")
+                .hasArg(false)
+                .build();
+
         Option help = new Option("h", "print this message");
 
         Options options = new Options();
@@ -74,6 +81,7 @@ public class AppearanceCreatorMain {
         options.addOption(genAttr);
         options.addOption(theme);
         options.addOption(surfData);
+        options.addOption(removeApp);
         options.addOption(help);
 
         String dbUsername = null;
@@ -84,6 +92,7 @@ public class AppearanceCreatorMain {
         String genericAttribute = null;
         String themeName = null;
         String surfaceDateName = null;
+        boolean removeAppearance = false;
 
         try {
             CommandLine line = parser.parse(options, args);
@@ -123,19 +132,28 @@ public class AppearanceCreatorMain {
             }
             if (line.hasOption("s")) {
                 surfaceDateName = line.getOptionValue("s");
-            } else {
+            }
+            if (line.hasOption("r")) {
+                removeAppearance = true;
+            }
+            else {
                 throw new RuntimeException("Database name is required!");
             }
 
         } catch (ParseException exp) {
             throw new RuntimeException("Unexpected exception:" + exp.getMessage());
         }
-        AppearanceCreatorMain.run(dbUsername, dbPassword, dbHost, dbPort, dbName, genericAttribute, themeName, surfaceDateName);
+        AppearanceCreatorMain.run(dbUsername, dbPassword, dbHost, dbPort, dbName, genericAttribute, themeName, surfaceDateName, removeAppearance);
     }
 
-    public static void run(String dbUsername, String dbPassword, String dbHost, String dbPort, String dbName, String genericAttribute, String themeName, String surfaceDateName) {
+    public static void run(String dbUsername, String dbPassword, String dbHost, String dbPort, String dbName, String genericAttribute, String themeName, String surfaceDateName, boolean removeAppearance) {
         DBConnector dbConnector = new DBConnector(dbUsername, dbPassword, dbHost, dbPort, dbName);
         Connection connection = dbConnector.openDbConnection();
+
+        if (removeAppearance) {
+            AppearanceRemover appearanceRemover = new AppearanceRemover(connection);
+            appearanceRemover.removeAppearanceAndSurfaceData(themeName, surfaceDateName);
+        }
 
         GenericAttributeGetter genericAttributeGetter = new GenericAttributeGetter(connection);
         List<GenericAttributeWithCityobject<DoubleAttribute>> genericAttributes = genericAttributeGetter.getGenericAttributes(genericAttribute);
