@@ -17,6 +17,9 @@ public class Util {
      * @return
      */
     public static Double[] calcX3dDiffuseColor(Double value, double max) {
+        if (value > max) {
+            value = max;
+        }
         Double r = ((255 * value) / max) / 255;
         Double g = ((255 * (max - value)) / max) / 255;
         Double[] rgb = {r, g, 0.0};
