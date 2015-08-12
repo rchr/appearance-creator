@@ -123,22 +123,28 @@ public class AppearanceCreatorMain {
             }
             if (line.hasOption("d")) {
                 dbName = line.getOptionValue("d");
+            } else {
+                throw new RuntimeException("Database name is required!");
             }
             if (line.hasOption("g")) {
                 genericAttribute = line.getOptionValue("g");
+            } else {
+                throw new RuntimeException("Name of generic attribute is required!");
             }
             if (line.hasOption("t")) {
                 themeName = line.getOptionValue("t");
+            } else {
+                throw new RuntimeException("Theme name is required!");
             }
             if (line.hasOption("s")) {
                 surfaceDateName = line.getOptionValue("s");
+            } else {
+                throw new RuntimeException("Surface-data name is required!");
             }
             if (line.hasOption("r")) {
                 removeAppearance = true;
             }
-            else {
-                throw new RuntimeException("Database name is required!");
-            }
+
 
         } catch (ParseException exp) {
             throw new RuntimeException("Unexpected exception:" + exp.getMessage());

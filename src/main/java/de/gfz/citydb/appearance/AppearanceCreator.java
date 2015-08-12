@@ -1,5 +1,9 @@
 package de.gfz.citydb.appearance;
 
+import de.gfz.citydb.appearance.color.ColorCalculator;
+import de.gfz.citydb.appearance.color.RGBColor;
+import de.gfz.citydb.statisics.StatisticsCalculator;
+import de.gfz.citydb.statisics.model.Quartile;
 import org.citygml4j.model.citygml.generics.DoubleAttribute;
 import org.citygml4j.util.gmlid.DefaultGMLIdManager;
 
@@ -19,16 +23,21 @@ public class AppearanceCreator {
     private static final String SELECT_FROM_APPEARANCE = "SELECT id FROM citydb.appearance WHERE cityobject_id = ? AND theme = ?";
     private static final String INSERT_INTO_SURFACE_DATA = "INSERT INTO citydb.surface_data (gmlid, name, is_front, objectclass_id, x3d_shininess, x3d_transparency, x3d_ambient_intensity, x3d_specular_color, x3d_diffuse_color, x3d_emissive_color, x3d_is_smooth) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     private static final String SELECT_FROM_SURFACE_DATA = "SELECT id FROM citydb.surface_data WHERE gmlid = ?";
-    private static final String INSERT_MAX = "WITH \n" +
+    private static final String INSERT_GENERIC_ATTRIB = "WITH \n" +
             "cityobj_id AS (\n" +
             "\tSELECT id, objectclass_id\n" +
             "\tFROM citydb.cityobject\n" +
             "\tWHERE gmlid = 'BLDG_GLOBAL_ATTRIBS'\n" +
             ")\n" +
             "INSERT INTO citydb.cityobject_genericattrib (cityobject_id, attrname, datatype, realval)\n" +
-            "SELECT id, 'MAX_ATTRIB_VAL_4_COLOR', 3, ? FROM cityobj_id";
+            "SELECT id, ?, 3, ? FROM cityobj_id";
+    private static final String DELETE_GENERIC_ATTRIB = "DELETE FROM citydb.cityobject_genericattrib WHERE attrname = ?";
+    private static final String MAX_ATTRIB_VAL_4_COLOR = "MAX_ATTRIB_VAL_4_COLOR";
+    private static final String MIN_ATTRIB_VAL_4_COLOR = "MIN_ATTRIB_VAL_4_COLOR";
+
 
     private Connection connection;
+    private ColorCalculator colorCalculator;
 
     public AppearanceCreator(Connection connection) {
         super();
@@ -41,16 +50,19 @@ public class AppearanceCreator {
      * @param genericAttributes
      */
     public void createAppearances(List<GenericAttributeWithCityobject<DoubleAttribute>> genericAttributes, Set<Integer> cityobjectsWOAttrib, String themeName, String surfaceDataName) {
-        double mean = Util.calcMean(genericAttributes);
-        double max = 2 * mean;
+        StatisticsCalculator statisticsCalculator = new StatisticsCalculator(genericAttributes);
+        Quartile quartile = statisticsCalculator.calcQuartiles();
+        // ColorCalculator to calculate colors in range from first to third quartile
+        this.colorCalculator = new ColorCalculator(quartile.getFirst(), quartile.getThird());
+
         try {
             for (GenericAttributeWithCityobject<DoubleAttribute> attribute : genericAttributes) {
-                createAppearanceForCityobject(attribute, max, themeName, surfaceDataName);
+                createAppearanceForCityobject(attribute, themeName, surfaceDataName);
             }
             for (Integer id : cityobjectsWOAttrib) {
                 createAppearanceForCityObjectWOAttrib(id, themeName, surfaceDataName);
             }
-            insertMaxAttribValueForColor(max);
+            insertAttribValuesForColor(quartile);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot create appearance.", e);
         }
@@ -62,11 +74,8 @@ public class AppearanceCreator {
         ResultSet rs = selectThematicSurfaces(id);
         while (rs.next()) {
             int lod2MultiSurfaceID = rs.getInt("lod2_multi_surface_id");
-
-            Double[] x3dDiffuseColor = {0.75, 0.75, 0.75};
+            RGBColor x3dDiffuseColor = new RGBColor(0.75, 0.75, 0.75);
             double x3dTransparency = 0.8;
-
-//            String name = "CO2 Emissions";
             int surfaceDataID = insertIntoSurfaceData(surfaceDataName, x3dDiffuseColor, x3dTransparency);
             insertIntoAppearToSurface(surfaceDataID, appearanceID);
             insertIntoTextureparam(lod2MultiSurfaceID, surfaceDataID);
@@ -77,10 +86,11 @@ public class AppearanceCreator {
      * Creates appearance for one {@link GenericAttributeWithCityobject<Double>}.
      *
      * @param attribute
-     * @param max       Max value of all attributes in color range.
+     * @param themeName
+     * @param surfaceDataName
      * @throws SQLException
      */
-    private void createAppearanceForCityobject(GenericAttributeWithCityobject<DoubleAttribute> attribute, double max, String themeName, String surfaceDataName) throws SQLException {
+    private void createAppearanceForCityobject(GenericAttributeWithCityobject<DoubleAttribute> attribute, String themeName, String surfaceDataName) throws SQLException {
         DoubleAttribute genericAttribute = attribute.getGenericAttribute();
         int appearanceID = insertIntoAppearance(themeName, attribute.getCityobjectID());
         ResultSet rs = selectThematicSurfaces(attribute.getCityobjectID());
@@ -91,11 +101,8 @@ public class AppearanceCreator {
             if (genericAttribute instanceof DoubleAttribute) {
                 value = ((DoubleAttribute) genericAttribute).getValue();
             }
-            Double[] x3dDiffuseColor = Util.calcX3dDiffuseColor(value, max);
-
+            RGBColor x3dDiffuseColor = colorCalculator.calcX3dDiffuseColor(value);
             double x3dTransparency = 0.15;
-
-//            String name = "CO2 Emissions";
             int surfaceDataID = insertIntoSurfaceData(surfaceDataName, x3dDiffuseColor, x3dTransparency);
             insertIntoAppearToSurface(surfaceDataID, appearanceID);
             insertIntoTextureparam(lod2MultiSurfaceID, surfaceDataID);
@@ -181,15 +188,15 @@ public class AppearanceCreator {
      * @return
      * @throws SQLException
      */
-    private int insertIntoSurfaceData(String name, Double[] x3dDiffuseColor, double x3d_transparency) throws SQLException {
+    private int insertIntoSurfaceData(String name, RGBColor x3dDiffuseColor, double x3d_transparency) throws SQLException {
         String uuid = DefaultGMLIdManager.getInstance().generateUUID();
         int isFront = 1;
         int objectclassID = 53;
         int x3dShininess = 0;
         double x3dAmbientIntensity = 0.2;
         String x3dSpecularColor = "0.0 0.0 0.0";
-        String x3dDifColor = x3dDiffuseColor[0] + " " + x3dDiffuseColor[1]
-                + " " + x3dDiffuseColor[2];
+        String x3dDifColor = x3dDiffuseColor.getRed() + " " + x3dDiffuseColor.getGreen()
+                + " " + x3dDiffuseColor.getBlue();
         String x3dEmissiveColor = "0.0 0.0 0.0";
         int x3dIsSmooth = 0;
 
@@ -224,9 +231,34 @@ public class AppearanceCreator {
      * @throws SQLException
      */
     private void insertMaxAttribValueForColor(double max) throws SQLException {
-        PreparedStatement st = connection.prepareStatement(INSERT_MAX);
+        PreparedStatement st = connection.prepareStatement(INSERT_GENERIC_ATTRIB);
         st.setDouble(1, max);
         st.executeUpdate();
+    }
+
+    private void insertAttribValuesForColor(Quartile quartile) throws SQLException {
+        deleteMinMaxAttribs4Color();
+
+        PreparedStatement st = connection.prepareStatement(INSERT_GENERIC_ATTRIB);
+        st.setString(1, MIN_ATTRIB_VAL_4_COLOR);
+        st.setDouble(2, quartile.getFirst());
+        st.executeUpdate();
+
+        st = connection.prepareStatement(INSERT_GENERIC_ATTRIB);
+        st.setString(1, MAX_ATTRIB_VAL_4_COLOR);
+        st.setDouble(2, quartile.getThird());
+        st.executeUpdate();
+        st.close();
+    }
+
+    private void deleteMinMaxAttribs4Color() throws SQLException {
+        PreparedStatement st = connection.prepareStatement(DELETE_GENERIC_ATTRIB);
+        st.setString(1, MIN_ATTRIB_VAL_4_COLOR);
+        st.executeUpdate();
+
+        st.setString(1, MAX_ATTRIB_VAL_4_COLOR);
+        st.executeUpdate();
+        st.close();
     }
 
 }
