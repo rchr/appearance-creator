@@ -4,9 +4,12 @@ import de.gfz.citydb.appearance.color.ColorCalculator;
 import de.gfz.citydb.appearance.color.RGBColor;
 import de.gfz.citydb.statisics.StatisticsCalculator;
 import de.gfz.citydb.statisics.model.Quartile;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.citygml4j.model.citygml.generics.DoubleAttribute;
 import org.citygml4j.util.gmlid.DefaultGMLIdManager;
 
+import java.awt.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -35,13 +38,17 @@ public class AppearanceCreator {
     private static final String MAX_ATTRIB_VAL_4_COLOR = "MAX_ATTRIB_VAL_4_COLOR";
     private static final String MIN_ATTRIB_VAL_4_COLOR = "MIN_ATTRIB_VAL_4_COLOR";
 
+    private static final Logger LOGGER = LogManager
+            .getLogger(AppearanceCreator.class);
 
     private Connection connection;
     private ColorCalculator colorCalculator;
+    private int grey;
 
     public AppearanceCreator(Connection connection) {
         super();
         this.connection = connection;
+        this.grey = (int) 1 * 255;
     }
 
     /**
@@ -50,6 +57,8 @@ public class AppearanceCreator {
      * @param genericAttributes
      */
     public void createAppearances(List<GenericAttributeWithCityobject<DoubleAttribute>> genericAttributes, Set<Integer> cityobjectsWOAttrib, String themeName, String surfaceDataName) {
+        LOGGER.info("Creating appearance! Theme name: " + themeName + "; surface-data name: " + surfaceDataName);
+
         StatisticsCalculator statisticsCalculator = new StatisticsCalculator(genericAttributes);
         Quartile quartile = statisticsCalculator.calcQuartiles();
         // ColorCalculator to calculate colors in range from first to third quartile
@@ -74,7 +83,8 @@ public class AppearanceCreator {
         ResultSet rs = selectThematicSurfaces(id);
         while (rs.next()) {
             int lod2MultiSurfaceID = rs.getInt("lod2_multi_surface_id");
-            RGBColor x3dDiffuseColor = new RGBColor(0.75, 0.75, 0.75);
+//            RGBColor x3dDiffuseColor = new RGBColor(0.75, 0.75, 0.75);
+            Color x3dDiffuseColor = new Color(grey, grey, grey);
             double x3dTransparency = 0.8;
             int surfaceDataID = insertIntoSurfaceData(surfaceDataName, x3dDiffuseColor, x3dTransparency);
             insertIntoAppearToSurface(surfaceDataID, appearanceID);
@@ -101,7 +111,8 @@ public class AppearanceCreator {
             if (genericAttribute instanceof DoubleAttribute) {
                 value = ((DoubleAttribute) genericAttribute).getValue();
             }
-            RGBColor x3dDiffuseColor = colorCalculator.calcX3dDiffuseColor(value);
+//            RGBColor x3dDiffuseColor = colorCalculator.calcX3dDiffuseColor(value);
+            Color x3dDiffuseColor = colorCalculator.calcX3dDiffuseColor(value);
             double x3dTransparency = 0.15;
             int surfaceDataID = insertIntoSurfaceData(surfaceDataName, x3dDiffuseColor, x3dTransparency);
             insertIntoAppearToSurface(surfaceDataID, appearanceID);
@@ -188,15 +199,18 @@ public class AppearanceCreator {
      * @return
      * @throws SQLException
      */
-    private int insertIntoSurfaceData(String name, RGBColor x3dDiffuseColor, double x3d_transparency) throws SQLException {
+    private int insertIntoSurfaceData(String name, Color x3dDiffuseColor, double x3d_transparency) throws SQLException {
         String uuid = DefaultGMLIdManager.getInstance().generateUUID();
         int isFront = 1;
         int objectclassID = 53;
         int x3dShininess = 0;
         double x3dAmbientIntensity = 0.2;
         String x3dSpecularColor = "0.0 0.0 0.0";
-        String x3dDifColor = x3dDiffuseColor.getRed() + " " + x3dDiffuseColor.getGreen()
-                + " " + x3dDiffuseColor.getBlue();
+        double red = x3dDiffuseColor.getRed() / 255.0;
+        double green = x3dDiffuseColor.getGreen() / 255.0;
+        double blue = x3dDiffuseColor.getBlue() / 255.0;
+        String x3dDifColor = red + " " + green
+                + " " + blue;
         String x3dEmissiveColor = "0.0 0.0 0.0";
         int x3dIsSmooth = 0;
 
@@ -227,6 +241,7 @@ public class AppearanceCreator {
     /**
      * Inserts value considered as max value into database.
      * Useful for visualizations.
+     *
      * @param max
      * @throws SQLException
      */

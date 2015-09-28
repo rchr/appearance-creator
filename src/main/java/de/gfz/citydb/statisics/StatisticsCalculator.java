@@ -9,15 +9,13 @@ import java.util.List;
 
 /**
  * Created by richard on 11.08.15.
+ *
+ * Wrapper to calculate statistics.
  */
 public class StatisticsCalculator {
 
     private DescriptiveStatistics descriptiveStatistics;
 
-    /**
-     * Wrapper to calculate statistics.
-     * @param genericAttributes
-     */
     public StatisticsCalculator(List<GenericAttributeWithCityobject<DoubleAttribute>> genericAttributes) {
         init(genericAttributes);
     }
@@ -27,6 +25,11 @@ public class StatisticsCalculator {
         this.descriptiveStatistics = new DescriptiveStatistics(values);
     }
 
+    /**
+     * Extracts the values from the generic attributes.
+     * @param genericAttributes
+     * @return
+     */
     private double[] extractValues(List<GenericAttributeWithCityobject<DoubleAttribute>> genericAttributes) {
         double[] vals = new double[genericAttributes.size()];
         for (int i = 0; i < genericAttributes.size(); i++) {

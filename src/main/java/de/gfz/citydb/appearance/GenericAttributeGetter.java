@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class GenericAttributeGetter {
 
@@ -52,7 +51,7 @@ public class GenericAttributeGetter {
         return genericAttributes;
     }
 
-       public Set<Integer> getCityObjectsWOGenericAttributes(String attrname) {
+    public Set<Integer> getCityObjectsWOGenericAttributes(String attrname) {
         Set<Integer> cityObjectIDs = new HashSet<>();
         try {
             PreparedStatement st = connection
