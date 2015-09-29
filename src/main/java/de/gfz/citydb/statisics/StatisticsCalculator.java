@@ -1,10 +1,16 @@
 package de.gfz.citydb.statisics;
 
 import de.gfz.citydb.appearance.GenericAttributeWithCityobject;
+import de.gfz.citydb.io.DBConnector;
 import de.gfz.citydb.statisics.model.Quartile;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.citygml4j.model.citygml.generics.DoubleAttribute;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**

@@ -10,10 +10,7 @@ import org.citygml4j.model.citygml.generics.DoubleAttribute;
 import org.citygml4j.util.gmlid.DefaultGMLIdManager;
 
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.List;
 import java.util.Set;
 
@@ -37,6 +34,20 @@ public class AppearanceCreator {
     private static final String DELETE_GENERIC_ATTRIB = "DELETE FROM citydb.cityobject_genericattrib WHERE attrname = ?";
     private static final String MAX_ATTRIB_VAL_4_COLOR = "MAX_ATTRIB_VAL_4_COLOR";
     private static final String MIN_ATTRIB_VAL_4_COLOR = "MIN_ATTRIB_VAL_4_COLOR";
+
+    private static final String CREATE_DUMMY_BUILDING = "WITH \n" +
+            "cityobj_id AS (\n" +
+            "SELECT id, objectclass_id\n" +
+            "FROM citydb.cityobject\n" +
+            "WHERE gmlid = 'BLDG_GLOBAL_ATTRIBS'\n" +
+            ")\n" +
+            "INSERT INTO citydb.building (id, building_root_id, class)\n" +
+            "SELECT id, id, objectclass_id FROM cityobj_id";
+
+    private static final String CREATE_DUMMY_CITYOBJECT = "INSERT INTO citydb.cityobject (objectclass_id, gmlid, creation_date, last_modification_date, updating_person) " +
+            "VALUES (26, 'BLDG_GLOBAL_ATTRIBS', current_timestamp, current_timestamp, 'appearance-creator')";
+
+    private static final String SELECT_DUMMY_CITY_OBJECT = "SELECT count(*) FROM citydb.cityobject WHERE gmlid='BLDG_GLOBAL_ATTRIBS'";
 
     private static final Logger LOGGER = LogManager
             .getLogger(AppearanceCreator.class);
@@ -72,6 +83,7 @@ public class AppearanceCreator {
                 createAppearanceForCityObjectWOAttrib(id, themeName, surfaceDataName);
             }
             insertAttribValuesForColor(quartile);
+            connection.commit();
         } catch (SQLException e) {
             throw new RuntimeException("Cannot create appearance.", e);
         }
@@ -254,6 +266,10 @@ public class AppearanceCreator {
     private void insertAttribValuesForColor(Quartile quartile) throws SQLException {
         deleteMinMaxAttribs4Color();
 
+        if (!dummyCityObjectExists()) {
+            setCreateDummyBuilding();
+        }
+
         PreparedStatement st = connection.prepareStatement(INSERT_GENERIC_ATTRIB);
         st.setString(1, MIN_ATTRIB_VAL_4_COLOR);
         st.setDouble(2, quartile.getFirst());
@@ -273,6 +289,28 @@ public class AppearanceCreator {
 
         st.setString(1, MAX_ATTRIB_VAL_4_COLOR);
         st.executeUpdate();
+        st.close();
+    }
+
+    private boolean dummyCityObjectExists() throws SQLException {
+        Statement st = connection.createStatement();
+        ResultSet rs = st.executeQuery(SELECT_DUMMY_CITY_OBJECT);
+
+        if (rs.next()) {
+            int count = rs.getInt(1);
+            if (count > 0) {
+                st.close();
+                return true;
+            }
+        }
+        st.close();
+        return false;
+    }
+
+    private void setCreateDummyBuilding() throws SQLException {
+        Statement st = connection.createStatement();
+        st.executeUpdate(CREATE_DUMMY_CITYOBJECT);
+        st.executeUpdate(CREATE_DUMMY_BUILDING);
         st.close();
     }
 
