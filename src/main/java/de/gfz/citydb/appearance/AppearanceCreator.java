@@ -17,7 +17,7 @@ import java.util.Set;
 public class AppearanceCreator {
 
     private static final String INSERT_INTO_APPEAR_TO_SURFACE = "INSERT INTO citydb.appear_to_surface_data (surface_data_id, appearance_id) VALUES (?, ?)";
-    private static final String SELECT_FROM_THEMATIC_SURFACE = "SELECT * FROM thematic_surface WHERE building_id = ?";
+    private static final String SELECT_FROM_THEMATIC_SURFACE = "SELECT * FROM citydb.thematic_surface WHERE building_id = ?";
     private static final String INSERT_INTO_TEXTUREPARAM = "INSERT INTO citydb.textureparam (surface_geometry_id, is_texture_parametrization, surface_data_id) VALUES (?, ?, ?)";
     private static final String INSERT_INTO_APPEARANCE = "INSERT INTO citydb.appearance (gmlid, theme, cityobject_id) VALUES (?, ?, ?)";
     private static final String SELECT_FROM_APPEARANCE = "SELECT id FROM citydb.appearance WHERE cityobject_id = ? AND theme = ?";
